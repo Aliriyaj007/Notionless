@@ -1,0 +1,1646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <title>Notionless - Markdown to Visualizer</title>
+    <style>
+        /* =========================================
+           CSS VARIABLES & RESET
+           ========================================= */
+        :root {
+            --bg-color: #121212;
+            --surface-color: #1e1e1e;
+            --border-color: #333333;
+            --text-primary: #e0e0e0;
+            --text-secondary: #a0a0a0;
+            --accent-color: #FFD700; /* Gold */
+            --accent-hover: #e6c200;
+            --danger-color: #ff4d4d;
+            --success-color: #00cc66;
+            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            --header-height: 60px;
+            --footer-height: 40px;
+            --safe-area-inset-top: env(safe-area-inset-top, 0px);
+            --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+            --safe-area-inset-left: env(safe-area-inset-left, 0px);
+            --safe-area-inset-right: env(safe-area-inset-right, 0px);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-text-size-adjust: 100%;
+        }
+
+        html {
+            height: 100%;
+            touch-action: manipulation;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            height: 100vh;
+            height: calc(100vh - var(--safe-area-inset-top) - var(--safe-area-inset-bottom));
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            padding-top: var(--safe-area-inset-top);
+            padding-bottom: var(--safe-area-inset-bottom);
+            padding-left: var(--safe-area-inset-left);
+            padding-right: var(--safe-area-inset-right);
+        }
+
+        /* =========================================
+           HEADER - RESPONSIVE
+           ========================================= */
+        header {
+            height: var(--header-height);
+            min-height: 50px;
+            background-color: var(--surface-color);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 15px;
+            padding-left: max(15px, var(--safe-area-inset-left));
+            padding-right: max(15px, var(--safe-area-inset-right));
+            z-index: 10;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .logo {
+            font-weight: 700;
+            font-size: clamp(1rem, 4vw, 1.2rem);
+            color: var(--accent-color);
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+        }
+
+        .logo svg {
+            width: clamp(20px, 5vw, 24px);
+            height: clamp(20px, 5vw, 24px);
+            flex-shrink: 0;
+        }
+
+        .controls {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        button {
+            background-color: var(--surface-color);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: clamp(5px, 2vw, 6px) clamp(8px, 2vw, 12px);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: clamp(0.75rem, 3vw, 0.85rem);
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            white-space: nowrap;
+            min-height: 32px;
+            touch-action: manipulation;
+        }
+
+        button:hover {
+            border-color: var(--accent-color);
+            color: var(--accent-color);
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        button.primary {
+            background-color: var(--accent-color);
+            color: var(--bg-color);
+            border: none;
+            font-weight: 600;
+        }
+
+        button.primary:hover {
+            background-color: var(--accent-hover);
+        }
+
+        .button-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1em;
+        }
+
+        .button-text {
+            display: inline;
+        }
+
+        .divider {
+            width: 1px;
+            height: 20px;
+            background: var(--border-color);
+            margin: 0 5px;
+            flex-shrink: 0;
+        }
+
+        /* =========================================
+           MAIN LAYOUT - RESPONSIVE SPLIT PANE
+           ========================================= */
+        main {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+            position: relative;
+            flex-direction: column;
+        }
+
+        /* Mobile toggle for editor/visualizer */
+        .pane-toggle {
+            display: none;
+            background-color: var(--surface-color);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 10px 15px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            text-align: center;
+            z-index: 20;
+            position: relative;
+            border-left: none;
+            border-right: none;
+        }
+
+        .pane-toggle:hover {
+            background-color: var(--border-color);
+        }
+
+        /* Left Pane: Editor */
+        #editor-pane {
+            width: 40%;
+            min-width: 300px;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border-color);
+            background-color: var(--bg-color);
+            transition: all 0.3s ease;
+        }
+
+        #editor-toolbar {
+            padding: clamp(8px, 2vw, 10px);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            font-size: clamp(0.7rem, 2vw, 0.8rem);
+            color: var(--text-secondary);
+            background-color: var(--surface-color);
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+
+        #stats-display {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        #markdown-input {
+            flex: 1;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            border: none;
+            resize: none;
+            padding: clamp(15px, 3vw, 20px);
+            font-family: 'Courier New', Courier, monospace;
+            font-size: clamp(0.9rem, 2.5vw, 1rem);
+            line-height: 1.6;
+            outline: none;
+            -webkit-overflow-scrolling: touch;
+            overflow-y: auto;
+        }
+
+        /* Right Pane: Visualization */
+        #visualizer-pane {
+            flex: 1;
+            position: relative;
+            background-color: #161616;
+            background-image: radial-gradient(#2a2a2a 1px, transparent 1px);
+            background-size: 20px 20px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #viz-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            gap: 5px;
+            background-color: var(--surface-color);
+            padding: 5px;
+            border-radius: 6px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            z-index: 5;
+            flex-wrap: wrap;
+        }
+
+        #view-switcher {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            display: flex;
+            background-color: var(--surface-color);
+            border-radius: 6px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            z-index: 5;
+        }
+
+        .view-btn {
+            border: none;
+            padding: clamp(6px, 2vw, 8px) clamp(12px, 3vw, 16px);
+            border-radius: 0;
+            background-color: var(--surface-color);
+            color: var(--text-secondary);
+            font-size: clamp(0.8rem, 2.5vw, 0.9rem);
+            min-width: 60px;
+        }
+
+        .view-btn.active {
+            background-color: var(--accent-color);
+            color: var(--bg-color);
+        }
+
+        /* SVG Container */
+        #diagram-container {
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+            touch-action: pan-x pan-y pinch-zoom;
+        }
+
+        #diagram-container:active {
+            cursor: grabbing;
+        }
+
+        svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+            user-select: none;
+        }
+
+        /* SVG Styles */
+        .node rect {
+            fill: var(--surface-color);
+            stroke: var(--accent-color);
+            stroke-width: 2px;
+            rx: 6;
+            transition: fill 0.2s;
+        }
+        
+        .node:hover rect {
+            fill: #252525;
+            filter: drop-shadow(0 0 5px var(--accent-color));
+        }
+
+        .node text {
+            fill: var(--text-primary);
+            font-size: clamp(12px, 2.5vw, 14px);
+            font-family: var(--font-family);
+            pointer-events: none;
+        }
+
+        .link {
+            fill: none;
+            stroke: var(--text-secondary);
+            stroke-width: 2px;
+            stroke-linecap: round;
+        }
+
+        /* =========================================
+           MODALS & TOAST - RESPONSIVE
+           ========================================= */
+        .toast {
+            position: fixed;
+            bottom: max(20px, var(--safe-area-inset-bottom));
+            right: max(20px, var(--safe-area-inset-right));
+            left: max(20px, var(--safe-area-inset-left));
+            background-color: var(--surface-color);
+            border-left: 4px solid var(--accent-color);
+            padding: 12px 15px;
+            border-radius: 4px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s ease;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            word-break: break-word;
+            max-width: 400px;
+            margin-left: auto;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+            padding: 20px;
+            padding-top: max(20px, var(--safe-area-inset-top));
+            padding-bottom: max(20px, var(--safe-area-inset-bottom));
+            padding-left: max(20px, var(--safe-area-inset-left));
+            padding-right: max(20px, var(--safe-area-inset-right));
+        }
+
+        .modal-overlay.open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal {
+            background-color: var(--surface-color);
+            width: min(600px, 90vw);
+            max-height: min(85vh, 90vh - var(--safe-area-inset-top) - var(--safe-area-inset-bottom));
+            border-radius: 8px;
+            padding: clamp(20px, 4vw, 30px);
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            position: relative;
+        }
+
+        .modal h2 {
+            color: var(--accent-color);
+            margin-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+            font-size: clamp(1.3rem, 4vw, 1.5rem);
+        }
+
+        .modal h3 {
+            margin-top: 15px;
+            margin-bottom: 10px;
+            color: var(--text-primary);
+            font-size: clamp(1rem, 3vw, 1.2rem);
+        }
+
+        .modal p, .modal li {
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin-bottom: 10px;
+            font-size: clamp(0.85rem, 3vw, 0.95rem);
+        }
+
+        .modal ul {
+            padding-left: 20px;
+        }
+
+        .credits {
+            margin-top: 25px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border-color);
+            text-align: center;
+            font-size: clamp(0.8rem, 3vw, 0.9rem);
+        }
+
+        .credits a {
+            color: var(--accent-color);
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .credits a:hover {
+            text-decoration: underline;
+        }
+
+        .close-modal {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 1.8rem;
+            cursor: pointer;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: background-color 0.2s;
+        }
+
+        .close-modal:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        /* =========================================
+           RESPONSIVE BREAKPOINTS
+           ========================================= */
+
+        /* Tablet Landscape / Small Desktop */
+        @media (max-width: 1024px) {
+            #editor-pane {
+                width: 45%;
+                min-width: 280px;
+            }
+            
+            .controls {
+                gap: 6px;
+            }
+            
+            button {
+                padding: 5px 10px;
+            }
+        }
+
+        /* Tablet Portrait */
+        @media (max-width: 900px) {
+            #editor-pane {
+                width: 50%;
+            }
+            
+            .controls .button-text {
+                display: none;
+            }
+            
+            .divider {
+                display: none;
+            }
+            
+            .controls button {
+                width: 36px;
+                height: 36px;
+                justify-content: center;
+                padding: 0;
+            }
+            
+            .controls button .button-icon {
+                margin: 0;
+                font-size: 1.2em;
+            }
+            
+            .logo span {
+                display: none;
+            }
+        }
+
+        /* Large Mobile / Small Tablet */
+        @media (max-width: 768px) {
+            main {
+                flex-direction: column;
+                position: relative;
+            }
+            
+            .pane-toggle {
+                display: block;
+            }
+            
+            #editor-pane {
+                width: 100%;
+                height: 50vh;
+                border-right: none;
+                border-bottom: 1px solid var(--border-color);
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                z-index: 15;
+                transform: translateY(0);
+                transition: transform 0.3s ease;
+            }
+            
+            #editor-pane.collapsed {
+                transform: translateY(calc(-100% + 40px));
+            }
+            
+            #visualizer-pane {
+                height: 100%;
+            }
+            
+            .pane-toggle span {
+                transition: transform 0.3s ease;
+            }
+            
+            #editor-pane.collapsed + .pane-toggle span {
+                transform: rotate(180deg);
+            }
+            
+            #viz-controls, #view-switcher {
+                position: fixed;
+                top: auto;
+                bottom: 20px;
+                flex-direction: row;
+            }
+            
+            #view-switcher {
+                left: 50%;
+                transform: translateX(-50%);
+                bottom: 20px;
+                top: auto;
+            }
+            
+            #viz-controls {
+                right: 20px;
+                bottom: 70px;
+            }
+            
+            .view-btn {
+                padding: 8px 16px;
+                font-size: 0.9rem;
+            }
+        }
+
+        /* Medium Mobile */
+        @media (max-width: 600px) {
+            header {
+                padding: 0 10px;
+                padding-left: max(10px, var(--safe-area-inset-left));
+                padding-right: max(10px, var(--safe-area-inset-right));
+                height: auto;
+                min-height: 50px;
+                padding-top: 5px;
+                padding-bottom: 5px;
+            }
+            
+            .controls {
+                gap: 4px;
+            }
+            
+            button {
+                min-height: 36px;
+                min-width: 36px;
+            }
+            
+            #editor-pane {
+                height: 60vh;
+            }
+            
+            #markdown-input {
+                font-size: 16px; /* Prevents iOS zoom on focus */
+            }
+            
+            .modal {
+                padding: 20px 15px;
+                width: 95vw;
+            }
+            
+            .close-modal {
+                top: 10px;
+                right: 10px;
+                width: 36px;
+                height: 36px;
+                font-size: 1.5rem;
+            }
+        }
+
+        /* Small Mobile */
+        @media (max-width: 480px) {
+            #editor-pane {
+                height: 70vh;
+            }
+            
+            .controls {
+                width: 100%;
+                justify-content: space-between;
+                margin-top: 5px;
+            }
+            
+            .controls button {
+                flex: 1;
+                max-width: calc(25% - 4px);
+                min-width: 0;
+            }
+            
+            #viz-controls {
+                bottom: 80px;
+                right: 10px;
+                padding: 4px;
+            }
+            
+            #view-switcher {
+                bottom: 10px;
+            }
+            
+            .toast {
+                left: 10px;
+                right: 10px;
+                max-width: none;
+                margin: 0;
+            }
+        }
+
+        /* Very Small Mobile */
+        @media (max-width: 360px) {
+            .logo {
+                font-size: 0.9rem;
+            }
+            
+            .controls button {
+                width: 32px;
+                height: 32px;
+            }
+            
+            #editor-pane {
+                height: 75vh;
+            }
+            
+            #editor-toolbar {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 5px;
+            }
+        }
+
+        /* Landscape Mode */
+        @media (max-height: 500px) and (orientation: landscape) {
+            body {
+                height: auto;
+                min-height: 100vh;
+            }
+            
+            #editor-pane {
+                height: 80vh;
+            }
+            
+            #markdown-input {
+                font-size: 14px;
+            }
+            
+            header {
+                flex-wrap: nowrap;
+            }
+            
+            .controls {
+                flex-wrap: nowrap;
+            }
+        }
+
+        /* Print Styles */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #diagram-container, #diagram-container * {
+                visibility: visible;
+            }
+            #diagram-container {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                height: 100%;
+                border: none;
+                background: white;
+            }
+            .node rect {
+                fill: white;
+                stroke: #000;
+            }
+            .node text {
+                fill: #000;
+            }
+            .link {
+                stroke: #000;
+            }
+        }
+
+        /* High Contrast Mode Support */
+        @media (prefers-contrast: high) {
+            :root {
+                --bg-color: #000000;
+                --surface-color: #000000;
+                --border-color: #ffffff;
+                --text-primary: #ffffff;
+                --text-secondary: #cccccc;
+                --accent-color: #ffff00;
+            }
+            
+            button {
+                border-width: 2px;
+            }
+        }
+
+        /* Reduced Motion */
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                transition-duration: 0.01ms !important;
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header -->
+    <header>
+        <div class="logo">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+            </svg>
+            <span>Notionless</span>
+        </div>
+        <div class="controls">
+            <button onclick="App.ui.toggleModal('guide-modal')">
+                <span class="button-icon">📘</span>
+                <span class="button-text">Guide</span>
+            </button>
+            <button onclick="App.actions.sampleData()">
+                <span class="button-icon">📋</span>
+                <span class="button-text">Sample</span>
+            </button>
+            <button onclick="App.actions.clearData()" style="color: var(--danger-color); border-color: rgba(255,77,77,0.3);">
+                <span class="button-icon">🗑️</span>
+                <span class="button-text">Clear</span>
+            </button>
+            <div class="divider"></div>
+            <button onclick="App.exporter.json()">
+                <span class="button-icon">📄</span>
+                <span class="button-text">JSON</span>
+            </button>
+            <button onclick="App.exporter.svg()">
+                <span class="button-icon">📐</span>
+                <span class="button-text">SVG</span>
+            </button>
+            <button onclick="App.exporter.png()">
+                <span class="button-icon">🖼️</span>
+                <span class="button-text">PNG</span>
+            </button>
+            <button onclick="App.exporter.pdf()">
+                <span class="button-icon">📊</span>
+                <span class="button-text">PDF</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main>
+        <!-- Left Editor -->
+        <section id="editor-pane">
+            <div id="editor-toolbar">
+                <span id="stats-display">Nodes: 0 | Headings: 0 | Words: 0</span>
+                <span>Markdown Supported</span>
+            </div>
+            <textarea id="markdown-input" placeholder="# Start typing here...&#10;## Level 2&#10;### Level 3&#10;Type '#' to create nodes." spellcheck="false"></textarea>
+        </section>
+
+        <!-- Pane Toggle for Mobile -->
+        <div class="pane-toggle" onclick="App.ui.toggleEditorPane()">
+            <span>▼</span> Toggle Editor
+        </div>
+
+        <!-- Right Visualizer -->
+        <section id="visualizer-pane">
+            <div id="view-switcher">
+                <button class="view-btn active" data-view="mindmap" onclick="App.ui.setView('mindmap')">Mindmap</button>
+                <button class="view-btn" data-view="flowchart" onclick="App.ui.setView('flowchart')">Flowchart</button>
+            </div>
+
+            <div id="viz-controls">
+                <button onclick="App.viz.zoomIn()" title="Zoom In" aria-label="Zoom In">+</button>
+                <button onclick="App.viz.zoomOut()" title="Zoom Out" aria-label="Zoom Out">-</button>
+                <button onclick="App.viz.resetView()" title="Reset View" aria-label="Reset View">↺</button>
+            </div>
+
+            <div id="diagram-container">
+                <svg id="main-svg">
+                    <g id="viewport">
+                        <g id="links-layer"></g>
+                        <g id="nodes-layer"></g>
+                    </g>
+                </svg>
+            </div>
+        </section>
+    </main>
+
+    <!-- User Guide Modal -->
+    <div id="guide-modal" class="modal-overlay">
+        <div class="modal">
+            <button class="close-modal" onclick="App.ui.toggleModal('guide-modal')" aria-label="Close">&times;</button>
+            <h2>User Guide</h2>
+            
+            <h3>What is Notionless?</h3>
+            <p>Notionless is a privacy-first tool to convert structured Markdown text into visual diagrams instantly. It runs entirely in your browser.</p>
+
+            <h3>How to Use</h3>
+            <ul>
+                <li><strong>Type:</strong> In the left panel, use Markdown headers (# H1, ## H2, ### H3) to define hierarchy.</li>
+                <li><strong>Visualize:</strong> The right panel updates automatically (500ms debounce).</li>
+                <li><strong>Navigate:</strong> Use the mouse wheel to zoom, and click-drag on the background to pan.</li>
+                <li><strong>Interact:</strong> Drag nodes in Mindmap mode to reorganize them visually.</li>
+                <li><strong>Mobile:</strong> On mobile devices, use the "Toggle Editor" button to switch between editor and visualizer.</li>
+            </ul>
+
+            <h3>Customization</h3>
+            <p>Switch between <strong>Mindmap</strong> (horizontal tree) and <strong>Flowchart</strong> (vertical tree) using the toggle at the top left of the visualization pane.</p>
+
+            <h3>Export & Import</h3>
+            <p>Use the header buttons to export your diagram as PNG, SVG, JSON, or PDF. The JSON export can be used to backup your data structure.</p>
+
+            <div class="credits">
+                <p>Made with ❤️ by <a href="https://github.com/Aliriyaj007" target="_blank" rel="noopener">Aliriyaj007</a></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast">
+        <span id="toast-icon">ℹ️</span>
+        <span id="toast-msg">Notification</span>
+    </div>
+
+    <script>
+        /**
+         * Notionless - Single File Application Logic
+         * Enhanced with responsive features
+         */
+
+        const App = (function() {
+            // =======================
+            // 1. STATE MANAGEMENT
+            // =======================
+            const State = {
+                markdown: "",
+                tree: [],
+                viewMode: "mindmap",
+                transform: { x: 0, y: 0, k: 1 },
+                isDragging: false,
+                lastMouse: { x: 0, y: 0 },
+                draggedNode: null,
+                isEditorCollapsed: false,
+                config: {
+                    nodeWidth: 120,
+                    nodeHeight: 40,
+                    levelGap: 100,
+                    siblingGap: 20
+                },
+                isTouchDevice: 'ontouchstart' in window || navigator.maxTouchPoints > 0
+            };
+
+            // =======================
+            // 2. UTILITIES
+            // =======================
+            const Utils = {
+                debounce(func, wait) {
+                    let timeout;
+                    return function(...args) {
+                        clearTimeout(timeout);
+                        timeout = setTimeout(() => func.apply(this, args), wait);
+                    };
+                },
+                
+                generateId() {
+                    return 'node_' + Math.random().toString(36).substr(2, 9);
+                },
+
+                getTextWidth(text, font) {
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    context.font = font;
+                    return context.measureText(text).width + 20;
+                },
+
+                isMobile() {
+                    return window.innerWidth <= 768;
+                },
+
+                isSmallMobile() {
+                    return window.innerWidth <= 480;
+                },
+
+                formatBytes(bytes, decimals = 2) {
+                    if (bytes === 0) return '0 Bytes';
+                    const k = 1024;
+                    const dm = decimals < 0 ? 0 : decimals;
+                    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                    const i = Math.floor(Math.log(bytes) / Math.log(k));
+                    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+                }
+            };
+
+            // =======================
+            // 3. PARSER (Markdown -> Tree)
+            // =======================
+            const Parser = {
+                parse(text) {
+                    const lines = text.split('\n');
+                    const root = { id: 'root', text: 'Root', level: 0, children: [], x: 0, y: 0 };
+                    const stack = [{ node: root, level: 0 }];
+                    let headingCount = 0;
+
+                    lines.forEach(line => {
+                        const trimmed = line.trim();
+                        if (!trimmed) return;
+
+                        const match = trimmed.match(/^(#{1,6})\s+(.*)/);
+                        if (match) {
+                            headingCount++;
+                            const level = match[1].length;
+                            const content = match[2];
+                            const newNode = {
+                                id: Utils.generateId(),
+                                text: content,
+                                level: level,
+                                children: []
+                            };
+
+                            while (stack.length > 0 && stack[stack.length - 1].level >= level) {
+                                stack.pop();
+                            }
+
+                            if (stack.length > 0) {
+                                stack[stack.length - 1].node.children.push(newNode);
+                                stack.push({ node: newNode, level: level });
+                            }
+                        }
+                    });
+
+                    if (root.children.length === 0 && text.trim() === "") {
+                        root.children = [{ id: Utils.generateId(), text: "Start Typing...", level: 1, children: [] }];
+                    }
+
+                    return { root, headingCount, wordCount: text.trim().split(/\s+/).filter(w => w).length };
+                }
+            };
+
+            // =======================
+            // 4. LAYOUT ENGINE
+            // =======================
+            const LayoutEngine = {
+                calculate(root, mode) {
+                    const isMindmap = mode === 'mindmap';
+                    const nodeWidth = Utils.isMobile() ? 100 : State.config.nodeWidth;
+                    const nodeHeight = Utils.isMobile() ? 35 : State.config.nodeHeight;
+                    const gap = State.config.siblingGap;
+
+                    this.calculateSize(root, nodeWidth, nodeHeight, gap);
+
+                    if (isMindmap) {
+                        root.x = 0;
+                        root.y = root.subtreeHeight / 2;
+                        this.positionMindmap(root, 0, root.y, State.config.levelGap);
+                    } else {
+                        root.x = root.subtreeWidth / 2;
+                        root.y = 0;
+                        this.positionFlowchart(root, root.x, 0, State.config.levelGap);
+                    }
+                },
+
+                calculateSize(node, w, h, gap) {
+                    if (node.children.length === 0) {
+                        node.width = w;
+                        node.height = h;
+                        node.subtreeWidth = w;
+                        node.subtreeHeight = h;
+                        return;
+                    }
+
+                    let totalWidth = 0;
+                    let maxHeight = 0;
+
+                    node.children.forEach(child => {
+                        this.calculateSize(child, w, h, gap);
+                        totalWidth += child.subtreeWidth;
+                        maxHeight = Math.max(maxHeight, child.subtreeHeight);
+                        if (child !== node.children[0]) totalWidth += gap;
+                    });
+
+                    node.width = w;
+                    node.height = h;
+                    node.subtreeWidth = totalWidth;
+                    node.subtreeHeight = maxHeight + h + gap;
+                },
+
+                positionMindmap(node, x, y, offset) {
+                    node.x = x;
+                    node.y = y;
+
+                    if (node.children.length > 0) {
+                        let currentY = y - (node.children[0].subtreeHeight / 2);
+                        
+                        node.children.forEach(child => {
+                            const childY = currentY + (child.subtreeHeight / 2);
+                            this.positionMindmap(child, x + node.width + offset, childY, offset);
+                            currentY += child.subtreeHeight + State.config.siblingGap;
+                        });
+                    }
+                },
+
+                positionFlowchart(node, x, y, offset) {
+                    node.x = x;
+                    node.y = y;
+
+                    if (node.children.length > 0) {
+                        let currentX = x - (node.children[0].subtreeWidth / 2);
+                        
+                        node.children.forEach(child => {
+                            const childX = currentX + (child.subtreeWidth / 2);
+                            this.positionFlowchart(child, childX, y + node.height + offset, offset);
+                            currentX += child.subtreeWidth + State.config.siblingGap;
+                        });
+                    }
+                }
+            };
+
+            // =======================
+            // 5. RENDERER
+            // =======================
+            const Renderer = {
+                nodesLayer: document.getElementById('nodes-layer'),
+                linksLayer: document.getElementById('links-layer'),
+                
+                clear() {
+                    this.nodesLayer.innerHTML = '';
+                    this.linksLayer.innerHTML = '';
+                },
+
+                render(root) {
+                    this.clear();
+                    root.children.forEach(child => {
+                        this.renderNode(child, null);
+                    });
+                },
+
+                renderNode(node, parent) {
+                    if (parent) {
+                        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                        path.setAttribute("class", "link");
+                        path.setAttribute("d", this.calculateLinkPath(parent, node));
+                        this.linksLayer.appendChild(path);
+                    }
+
+                    const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                    g.setAttribute("class", "node");
+                    g.setAttribute("transform", `translate(${node.x - node.width/2}, ${node.y - node.height/2})`);
+                    g.dataset.id = node.id;
+
+                    // Touch support
+                    if (State.isTouchDevice) {
+                        g.addEventListener('touchstart', (e) => {
+                            if(State.viewMode !== 'mindmap') return;
+                            e.preventDefault();
+                            State.draggedNode = node;
+                            State.isDraggingNode = true;
+                        }, { passive: false });
+                    }
+
+                    g.addEventListener('mousedown', (e) => {
+                        if(State.viewMode !== 'mindmap') return;
+                        e.stopPropagation();
+                        State.draggedNode = node;
+                        State.isDraggingNode = true;
+                    });
+
+                    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                    rect.setAttribute("width", node.width);
+                    rect.setAttribute("height", node.height);
+                    
+                    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                    text.setAttribute("x", node.width / 2);
+                    text.setAttribute("y", node.height / 2);
+                    text.setAttribute("dy", "0.35em");
+                    text.setAttribute("text-anchor", "middle");
+                    
+                    // Truncate text based on screen size
+                    const maxLength = Utils.isSmallMobile() ? 10 : Utils.isMobile() ? 15 : 20;
+                    text.textContent = node.text.length > maxLength ? 
+                        node.text.substring(0, maxLength - 3) + '...' : node.text;
+                    
+                    const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
+                    title.textContent = node.text;
+
+                    g.appendChild(rect);
+                    g.appendChild(text);
+                    g.appendChild(title);
+                    this.nodesLayer.appendChild(g);
+
+                    if (node.children) {
+                        node.children.forEach(child => this.renderNode(child, node));
+                    }
+                },
+
+                calculateLinkPath(parent, child) {
+                    if (State.viewMode === 'mindmap') {
+                        const pX = parent.x + parent.width/2;
+                        const pY = parent.y;
+                        const cX = child.x - child.width/2;
+                        const cY = child.y;
+                        return `M ${pX} ${pY} C ${(pX+cX)/2} ${pY}, ${(pX+cX)/2} ${cY}, ${cX} ${cY}`;
+                    } else {
+                        const pX = parent.x;
+                        const pY = parent.y + parent.height/2;
+                        const cX = child.x;
+                        const cY = child.y - child.height/2;
+                        return `M ${pX} ${pY} C ${pX} ${(pY+cY)/2}, ${cX} ${(pY+cY)/2}, ${cX} ${cY}`;
+                    }
+                }
+            };
+
+            // =======================
+            // 6. INTERACTIONS
+            // =======================
+            const Interaction = {
+                container: document.getElementById('diagram-container'),
+                viewport: document.getElementById('viewport'),
+                
+                init() {
+                    // Touch events for mobile
+                    if (State.isTouchDevice) {
+                        this.container.addEventListener('touchstart', (e) => {
+                            if(e.target.closest('.node')) return;
+                            if (e.touches.length === 1) {
+                                State.isDragging = true;
+                                State.lastMouse = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                            } else if (e.touches.length === 2) {
+                                e.preventDefault(); // Prevent scrolling during pinch zoom
+                            }
+                        }, { passive: false });
+
+                        this.container.addEventListener('touchmove', (e) => {
+                            if (State.isDragging && e.touches.length === 1) {
+                                e.preventDefault();
+                                const dx = e.touches[0].clientX - State.lastMouse.x;
+                                const dy = e.touches[0].clientY - State.lastMouse.y;
+                                State.transform.x += dx;
+                                State.transform.y += dy;
+                                State.lastMouse = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                                this.updateTransform();
+                            }
+                        }, { passive: false });
+
+                        this.container.addEventListener('touchend', () => {
+                            State.isDragging = false;
+                            State.isDraggingNode = false;
+                            State.draggedNode = null;
+                        });
+
+                        // Pinch zoom
+                        let lastDistance = 0;
+                        this.container.addEventListener('touchmove', (e) => {
+                            if (e.touches.length === 2) {
+                                e.preventDefault();
+                                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                                const distance = Math.sqrt(dx * dx + dy * dy);
+                                
+                                if (lastDistance > 0) {
+                                    const scaleAmount = (distance - lastDistance) * 0.01;
+                                    const newScale = Math.min(Math.max(0.1, State.transform.k + scaleAmount), 5);
+                                    State.transform.k = newScale;
+                                    this.updateTransform();
+                                }
+                                lastDistance = distance;
+                            }
+                        }, { passive: false });
+
+                        this.container.addEventListener('touchend', () => {
+                            lastDistance = 0;
+                        });
+                    }
+
+                    // Mouse events
+                    this.container.addEventListener('mousedown', (e) => {
+                        if(e.target.closest('.node')) return;
+                        State.isDragging = true;
+                        State.lastMouse = { x: e.clientX, y: e.clientY };
+                    });
+
+                    window.addEventListener('mousemove', (e) => {
+                        if (State.isDragging) {
+                            const dx = e.clientX - State.lastMouse.x;
+                            const dy = e.clientY - State.lastMouse.y;
+                            State.transform.x += dx;
+                            State.transform.y += dy;
+                            State.lastMouse = { x: e.clientX, y: e.clientY };
+                            this.updateTransform();
+                        } else if (State.isDraggingNode && State.draggedNode) {
+                            const pt = this.getSVGPoint(e.clientX, e.clientY);
+                            State.draggedNode.x = pt.x;
+                            State.draggedNode.y = pt.y;
+                            Renderer.render(State.tree);
+                        }
+                    });
+
+                    window.addEventListener('mouseup', () => {
+                        State.isDragging = false;
+                        State.isDraggingNode = false;
+                        State.draggedNode = null;
+                    });
+
+                    // Wheel zoom
+                    this.container.addEventListener('wheel', (e) => {
+                        e.preventDefault();
+                        const scaleAmount = -e.deltaY * 0.001;
+                        const newScale = Math.min(Math.max(0.1, State.transform.k + scaleAmount), 5);
+                        State.transform.k = newScale;
+                        this.updateTransform();
+                    }, { passive: false });
+                },
+
+                getSVGPoint(clientX, clientY) {
+                    const pt = document.getElementById('main-svg').createSVGPoint();
+                    pt.x = clientX;
+                    pt.y = clientY;
+                    const globalPt = pt.matrixTransform(this.viewport.getScreenCTM().inverse());
+                    return globalPt;
+                },
+
+                updateTransform() {
+                    this.viewport.setAttribute('transform', 
+                        `translate(${State.transform.x}, ${State.transform.y}) scale(${State.transform.k})`);
+                },
+
+                zoomIn() {
+                    State.transform.k = Math.min(State.transform.k * 1.2, 5);
+                    this.updateTransform();
+                },
+
+                zoomOut() {
+                    State.transform.k = Math.max(State.transform.k / 1.2, 0.1);
+                    this.updateTransform();
+                },
+
+                resetView() {
+                    const container = document.getElementById('visualizer-pane');
+                    State.transform = { 
+                        x: container.clientWidth / 2, 
+                        y: container.clientHeight / 2, 
+                        k: 1 
+                    };
+                    if (State.viewMode === 'mindmap') {
+                        State.transform.x -= 100;
+                    }
+                    this.updateTransform();
+                }
+            };
+
+            // =======================
+            // 7. UI MANAGER
+            // =======================
+            const UIManager = {
+                statsEl: document.getElementById('stats-display'),
+                toastEl: document.getElementById('toast'),
+                editorPane: document.getElementById('editor-pane'),
+                toastTimeout: null,
+
+                updateStats(nodes, headings, words) {
+                    const display = Utils.isSmallMobile() 
+                        ? `N:${nodes} H:${headings} W:${words}`
+                        : `Nodes: ${nodes} | Headings: ${headings} | Words: ${words}`;
+                    this.statsEl.textContent = display;
+                },
+
+                showToast(msg, type = 'info') {
+                    this.toastEl.querySelector('#toast-msg').textContent = msg;
+                    const icon = this.toastEl.querySelector('#toast-icon');
+                    icon.textContent = type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️';
+                    this.toastEl.style.borderLeftColor = type === 'success' ? 'var(--success-color)' : 
+                                                       type === 'error' ? 'var(--danger-color)' : 'var(--accent-color)';
+                    this.toastEl.classList.add('show');
+                    
+                    clearTimeout(this.toastTimeout);
+                    this.toastTimeout = setTimeout(() => {
+                        this.toastEl.classList.remove('show');
+                    }, 3000);
+                },
+
+                toggleModal(id) {
+                    const el = document.getElementById(id);
+                    el.classList.toggle('open');
+                    document.body.style.overflow = el.classList.contains('open') ? 'hidden' : '';
+                },
+
+                setView(mode) {
+                    State.viewMode = mode;
+                    document.querySelectorAll('.view-btn').forEach(b => {
+                        b.classList.toggle('active', b.dataset.view === mode);
+                    });
+                    Core.process();
+                    Interaction.resetView();
+                },
+
+                toggleEditorPane() {
+                    State.isEditorCollapsed = !State.isEditorCollapsed;
+                    this.editorPane.classList.toggle('collapsed', State.isEditorCollapsed);
+                    
+                    // Update button text
+                    const toggleBtn = document.querySelector('.pane-toggle span');
+                    toggleBtn.textContent = State.isEditorCollapsed ? '▲' : '▼';
+                    
+                    // Reset visualizer view when toggling
+                    setTimeout(() => Interaction.resetView(), 300);
+                },
+
+                handleResize() {
+                    if (!Utils.isMobile()) {
+                        this.editorPane.classList.remove('collapsed');
+                        State.isEditorCollapsed = false;
+                    }
+                    Core.process();
+                    Interaction.resetView();
+                }
+            };
+
+            // =======================
+            // 8. EXPORT MANAGER
+            // =======================
+            const Exporter = {
+                getSVGString() {
+                    const svg = document.getElementById('main-svg').cloneNode(true);
+                    // Remove transform for export
+                    const viewport = svg.querySelector('#viewport');
+                    viewport.removeAttribute('transform');
+                    
+                    // Update dimensions
+                    const bounds = this.getDiagramBounds();
+                    svg.setAttribute('width', bounds.width + 100);
+                    svg.setAttribute('height', bounds.height + 100);
+                    svg.setAttribute('viewBox', `${bounds.x - 50} ${bounds.y - 50} ${bounds.width + 100} ${bounds.height + 100}`);
+                    
+                    const serializer = new XMLSerializer();
+                    let source = serializer.serializeToString(svg);
+                    source = source.replace(/<svg/, '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"');
+                    return source;
+                },
+
+                getDiagramBounds() {
+                    const nodes = document.querySelectorAll('.node');
+                    if (nodes.length === 0) return { x: 0, y: 0, width: 800, height: 600 };
+                    
+                    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                    
+                    nodes.forEach(node => {
+                        const rect = node.querySelector('rect');
+                        if (rect) {
+                            const x = parseFloat(node.getAttribute('transform').match(/translate\(([^,]+),/)[1]);
+                            const y = parseFloat(node.getAttribute('transform').match(/translate\([^,]+,([^)]+)/)[1]);
+                            const width = parseFloat(rect.getAttribute('width'));
+                            const height = parseFloat(rect.getAttribute('height'));
+                            
+                            minX = Math.min(minX, x);
+                            minY = Math.min(minY, y);
+                            maxX = Math.max(maxX, x + width);
+                            maxY = Math.max(maxY, y + height);
+                        }
+                    });
+                    
+                    return {
+                        x: minX,
+                        y: minY,
+                        width: maxX - minX,
+                        height: maxY - minY
+                    };
+                },
+
+                downloadFile(content, filename, type) {
+                    try {
+                        const blob = new Blob([content], { type: type });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = filename;
+                        a.style.display = 'none';
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        setTimeout(() => URL.revokeObjectURL(url), 100);
+                        UIManager.showToast(`Exported ${filename}`, 'success');
+                    } catch (error) {
+                        UIManager.showToast('Export failed: ' + error.message, 'error');
+                    }
+                },
+
+                png() {
+                    try {
+                        const svgData = this.getSVGString();
+                        const img = new Image();
+                        const svgBlob = new Blob([svgData], {type: 'image/svg+xml;charset=utf-8'});
+                        const url = URL.createObjectURL(svgBlob);
+                        
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            const bounds = this.getDiagramBounds();
+                            canvas.width = Math.max(800, bounds.width + 100);
+                            canvas.height = Math.max(600, bounds.height + 100);
+                            const ctx = canvas.getContext('2d');
+                            ctx.fillStyle = '#161616';
+                            ctx.fillRect(0, 0, canvas.width, canvas.height);
+                            ctx.drawImage(img, 50, 50, bounds.width, bounds.height);
+                            
+                            canvas.toBlob((blob) => {
+                                const pngUrl = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = pngUrl;
+                                a.download = "notionless_diagram.png";
+                                document.body.appendChild(a);
+                                a.click();
+                                document.body.removeChild(a);
+                                UIManager.showToast("Exported PNG", "success");
+                                setTimeout(() => {
+                                    URL.revokeObjectURL(url);
+                                    URL.revokeObjectURL(pngUrl);
+                                }, 100);
+                            }, 'image/png');
+                        };
+                        
+                        img.onerror = () => {
+                            UIManager.showToast("Failed to generate PNG", "error");
+                            URL.revokeObjectURL(url);
+                        };
+                        
+                        img.src = url;
+                    } catch (error) {
+                        UIManager.showToast('PNG export failed: ' + error.message, 'error');
+                    }
+                },
+
+                svg() {
+                    try {
+                        this.downloadFile(this.getSVGString(), 'notionless_diagram.svg', 'image/svg+xml');
+                    } catch (error) {
+                        UIManager.showToast('SVG export failed: ' + error.message, 'error');
+                    }
+                },
+
+                json() {
+                    try {
+                        const data = JSON.stringify({
+                            markdown: State.markdown,
+                            tree: State.tree,
+                            viewMode: State.viewMode,
+                            exportedAt: new Date().toISOString()
+                        }, null, 2);
+                        this.downloadFile(data, 'notionless_data.json', 'application/json');
+                    } catch (error) {
+                        UIManager.showToast('JSON export failed: ' + error.message, 'error');
+                    }
+                },
+
+                pdf() {
+                    window.print();
+                    UIManager.showToast("PDF/Print dialog opened", "info");
+                }
+            };
+
+            // =======================
+            // 9. CORE LOGIC
+            // =======================
+            const Core = {
+                inputEl: document.getElementById('markdown-input'),
+
+                init() {
+                    Interaction.init();
+                    
+                    // Initial Load
+                    this.inputEl.value = "# Project Plan\n## Research\n## Design\n### UI\n### UX\n## Development\n## Testing";
+                    this.process();
+
+                    // Listeners
+                    const processDebounced = Utils.debounce(() => this.process(), 500);
+                    this.inputEl.addEventListener('input', processDebounced);
+                    
+                    // Resize handling
+                    const resizeDebounced = Utils.debounce(() => UIManager.handleResize(), 250);
+                    window.addEventListener('resize', resizeDebounced);
+                    
+                    // Keyboard shortcuts
+                    document.addEventListener('keydown', (e) => {
+                        if (e.ctrlKey || e.metaKey) {
+                            switch(e.key.toLowerCase()) {
+                                case 's':
+                                    e.preventDefault();
+                                    App.exporter.json();
+                                    break;
+                                case 'e':
+                                    e.preventDefault();
+                                    App.exporter.png();
+                                    break;
+                                case 'g':
+                                    e.preventDefault();
+                                    UIManager.toggleModal('guide-modal');
+                                    break;
+                            }
+                        }
+                    });
+
+                    // Prevent context menu on touch devices for better UX
+                    if (State.isTouchDevice) {
+                        document.addEventListener('contextmenu', (e) => {
+                            if (e.target.closest('#diagram-container')) {
+                                e.preventDefault();
+                            }
+                        });
+                    }
+                },
+
+                process() {
+                    try {
+                        const text = this.inputEl.value;
+                        const { root, headingCount, wordCount } = Parser.parse(text);
+                        
+                        State.markdown = text;
+                        State.tree = root;
+
+                        LayoutEngine.calculate(root, State.viewMode);
+                        Renderer.render(root);
+
+                        let nodeCount = 0;
+                        const countNodes = (n) => { nodeCount++; n.children.forEach(countNodes); };
+                        root.children.forEach(countNodes);
+                        UIManager.updateStats(nodeCount, headingCount, wordCount);
+                    } catch (error) {
+                        console.error('Processing error:', error);
+                        UIManager.showToast('Error processing markdown', 'error');
+                    }
+                }
+            };
+
+            // Expose public API
+            return {
+                core: Core,
+                ui: UIManager,
+                viz: Interaction,
+                exporter: Exporter,
+                actions: {
+                    sampleData: () => {
+                        const sample = "# Core Concepts\n## Privacy\n### Local Storage\n### No Tracking\n## Performance\n### Debounced Input\n### SVG Rendering\n## Features\n### Mindmap\n### Flowchart\n### Export Options";
+                        document.getElementById('markdown-input').value = sample;
+                        Core.process();
+                        UIManager.showToast("Sample data loaded");
+                    },
+                    clearData: () => {
+                        document.getElementById('markdown-input').value = "";
+                        Core.process();
+                        UIManager.showToast("Editor cleared");
+                    }
+                },
+                get state() { return State; }
+            };
+
+        })();
+
+        // Initialize App
+        document.addEventListener('DOMContentLoaded', () => {
+            App.core.init();
+            App.viz.resetView();
+            
+            // Handle iOS safe areas
+            if (/(iPad|iPhone|iPod)/g.test(navigator.userAgent)) {
+                document.body.classList.add('ios-device');
+            }
+            
+            // Handle Android Chrome
+            if (/Android/.test(navigator.userAgent)) {
+                document.body.classList.add('android-device');
+            }
+        });
+
+        // Prevent iOS bounce
+        document.addEventListener('touchmove', function(e) {
+            if (e.target.closest('#diagram-container') || e.target.closest('.modal')) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        // Handle orientation change
+        window.addEventListener('orientationchange', () => {
+            setTimeout(() => {
+                App.viz.resetView();
+                App.ui.handleResize();
+            }, 300);
+        });
+
+    </script>
+</body>
+</html>
